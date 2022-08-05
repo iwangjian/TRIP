@@ -214,10 +214,10 @@ def run_test(args):
 
 if __name__ == "__main__":
     args = parse_config()
-    print_args(args)
     set_seed(args)
     
     if args.mode == "train":
+        print_args(args)
         run_train(args)
     elif args.mode == "test":
         run_test(args)

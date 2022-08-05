@@ -31,7 +31,8 @@ def calc_succ(eval_fp, gold_fp):
     movie_total, music_total, poi_total, food_total = 0, 0, 0, 0
     
     for eval_sample, gold_sample in zip(all_eval, all_gold):
-        if gold_sample["topic_path"][0] == gold_sample["target"][1] and \
+        if gold_sample["action_path"][0] == gold_sample["target"][0] and \
+            gold_sample["topic_path"][0] == gold_sample["target"][1] and \
                 gold_sample["target"][1].lower() in gold_sample["response"].lower():
             # eval this turn
             eval_action = gold_sample["target"][0]

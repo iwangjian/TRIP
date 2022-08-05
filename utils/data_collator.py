@@ -183,3 +183,55 @@ class DialCollator(object):
         }
 
         return collated_batch
+
+
+class DialGPT2Collator(object):
+    """
+    Data collator for dialogue generation
+    """
+    def __init__(self, device, padding_idx=0):
+        self.device = device
+        self.padding_idx = padding_idx
+    
+    def list_to_tensor(self, list_l):
+        max_len = max_seq_length(list_l)
+        padded_lists = []
+        for list_seq in list_l:
+            padded_lists.append(pad_sequence(list_seq, max_len, padding_value=self.padding_idx))
+        input_tensor = torch.tensor(padded_lists, dtype=torch.long)
+        input_tensor = input_tensor.to(self.device).contiguous()
+        return input_tensor
+    
+    def get_attention_mask(self, data_tensor: torch.tensor):
+        attention_mask = data_tensor.masked_fill(data_tensor == self.padding_idx, 0)
+        attention_mask = attention_mask.masked_fill(attention_mask != self.padding_idx, 1)
+        attention_mask = attention_mask.to(self.device).contiguous()
+        return attention_mask
+    
+    def custom_collate(self, mini_batch):
+        """Custom collate function for dealing with batches of input data.
+        Arguments:
+            mini_batch: A list of input features.
+        Return:
+            dict: (dict) A dict of tensors.
+        """
+        batch_input, batch_control, batch_label = [], [], []
+        
+        for sample in mini_batch:
+            batch_input.append(sample.input_ids)
+            batch_control.append(sample.control_ids)
+            batch_label.append(sample.lm_labels)
+        
+        input_ids = self.list_to_tensor(batch_input)
+        control_ids = self.list_to_tensor(batch_control)
+        control_masks = self.get_attention_mask(control_ids)
+        lm_labels = self.list_to_tensor(batch_label)
+        
+        collated_batch = {
+            "input_ids": input_ids,
+            "control_ids": control_ids,
+            "control_masks": control_masks,
+            "lm_labels": lm_labels
+        }
+
+        return collated_batch

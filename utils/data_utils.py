@@ -33,9 +33,9 @@ def convert_ids_to_tokens(output, tokenizer):
         decode_tokens = tokenizer.decode(output[idx, :]).split()
         return_tokens = []
         for token in decode_tokens:
-            if token == BOS or token == PAD:
+            if token == BOS:
                 continue
-            elif token == EOS:
+            elif token == EOS or token == PAD:
                 break
             elif token.upper() == "NULL":
                 return_tokens.append("NULL")
