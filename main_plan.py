@@ -50,7 +50,7 @@ def parse_config():
     parser.add_argument('--num_negatives', type=int, default=3)
     parser.add_argument('--lr', type=float, default=2e-5)
     parser.add_argument('--weight_decay', type=float, default=0.01)
-    parser.add_argument('--warm_up_ratio', type=float, default=0.1)
+    parser.add_argument('--warmup_ratio', type=float, default=0.1)
     parser.add_argument('--max_grad_norm', type=float, default=0.5)
     parser.add_argument('--hidden_size', type=int, default=768)
     parser.add_argument('--max_position_embeddings', type=int, default=512)
@@ -128,7 +128,7 @@ def run_train(args):
     # create dataloader
     collator = PlanCollator(device=device, padding_idx=args.pad_token_id)
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=collator.custom_collate)
-    dev_loader = DataLoader(dev_dataset, batch_size=args.batch_size // 2, shuffle=False, collate_fn=collator.custom_collate)
+    dev_loader = DataLoader(dev_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collator.custom_collate)
 
     # build model
     if args.load_checkpoint is not None:
@@ -143,7 +143,7 @@ def run_train(args):
     # build trainer and execute model training
     trainer = Trainer(model=model, train_loader=train_loader, dev_loader=dev_loader,
         log_dir=args.log_dir, log_steps=args.log_steps, validate_steps=args.validate_steps, 
-        num_epochs=args.num_epochs, lr=args.lr, warm_up_ratio=args.warm_up_ratio,
+        num_epochs=args.num_epochs, lr=args.lr, warmup_ratio=args.warmup_ratio,
         weight_decay=args.weight_decay, max_grad_norm=args.max_grad_norm
     )
     trainer.train()

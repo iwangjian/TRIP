@@ -10,11 +10,11 @@ from tqdm import tqdm
 
 import torch
 from torch.utils.data import DataLoader
-from model.model_trip_dial import TRIPDial
-from utils.dataset import DialDataset
+from model.model_trip_dial_gpt2 import TRIPDialGPT2
+from utils.dataset import DialGPT2Dataset
 from utils.data_utils import get_tokenizer, convert_ids_to_tokens
-from utils.data_collator import DialCollator
-from utils.trainer import Trainer
+from utils.data_collator import DialGPT2Collator
+from utils.trainer import Trainer, IgniteTrainer
 
 logging.basicConfig(
     level = logging.INFO,
@@ -34,30 +34,33 @@ def parse_config():
     parser.add_argument('--train_data', type=str, default=None)
     parser.add_argument('--dev_data', type=str, default=None)
     parser.add_argument('--test_data', type=str, default=None)
-    parser.add_argument('--bert_dir', type=str, default="config/bert-base-chinese")
-    parser.add_argument('--plan_data_path', type=str, default=None)
-    parser.add_argument('--plan_model_path', type=str, default=None)
+    parser.add_argument('--plan_data', type=str, default=None)
+    parser.add_argument('--config_dir', type=str, default="uer/gpt2-chinese-cluecorpussmall")
     parser.add_argument('--cache_dir', type=str, default="caches/dial/")
     parser.add_argument('--log_dir', type=str, default="logs/dial/")
+    parser.add_argument('--max_seq_len', type=int, default=512)
+    parser.add_argument('--turn_type_size', type=int, default=16)
 
     # training args
     parser.add_argument('--load_checkpoint', type=str, default=None)
-    parser.add_argument('--num_epochs', type=int, default=10)
-    parser.add_argument('--batch_size', type=int, default=8)
+    parser.add_argument('--num_epochs', type=int, default=5)
+    parser.add_argument('--batch_size', type=int, default=6)
     parser.add_argument('--log_steps', type=int, default=200)
     parser.add_argument('--validate_steps', type=int, default=1000)
-    parser.add_argument('--max_seq_len', type=int, default=512)
-    parser.add_argument('--turn_type_size', type=int, default=16)
     parser.add_argument('--use_control', type=str2bool, default="False")
     parser.add_argument('--lr', type=float, default=2e-5)
     parser.add_argument('--weight_decay', type=float, default=0.01)
-    parser.add_argument('--warm_up_ratio', type=float, default=0.1)
-    parser.add_argument('--max_grad_norm', type=float, default=0.5)
+    parser.add_argument('--warmup_ratio', type=float, default=0.1)
+    parser.add_argument("--scheduler", type=str, default="linear", choices=['linear','noam'], help="Method of optim")
+    parser.add_argument('--warmup_steps', type=int, default=3000)
+    parser.add_argument("--from_step", type=int, default=-1, help="Init learning rate from this step")
+    parser.add_argument('--max_grad_norm', type=float, default=1.0)
+    parser.add_argument('--gradient_accumulation_steps', type=int, default=64)
     parser.add_argument('--hidden_size', type=int, default=768)
     parser.add_argument('--max_position_embeddings', type=int, default=512)
     parser.add_argument('--share_embedding', type=str2bool, default="False")
     parser.add_argument('--scale_embedding', type=str2bool, default="True")
-    parser.add_argument('--decoder_layers', type=int, default=6)
+    parser.add_argument('--decoder_layers', type=int, default=3)
     parser.add_argument('--decoder_attention_heads', type=int, default=8)
     parser.add_argument('--activation_function', type=str, default="gelu")
     parser.add_argument('--decoder_ffn_dim', type=int, default=3072)
@@ -72,11 +75,10 @@ def parse_config():
     parser.add_argument('--output_dir', type=str, default="outputs/dial/")
     parser.add_argument('--test_batch_size', type=int, default=4)
     parser.add_argument('--max_dec_len', type=int, default=100)
-    parser.add_argument('--beam_size', type=int, default=3)
-    parser.add_argument('--min_length', type=int, default=1)
-    parser.add_argument('--repetition_penalty', type=float, default=1.0)
-    parser.add_argument('--diversity_penalty', type=float, default=0.0)
-    parser.add_argument('--no_repeat_ngram_size', type=int, default=0)
+    parser.add_argument("--min_dec_len", type=int, default=1)
+    parser.add_argument("--temperature", type=float, default=1.0)
+    parser.add_argument("--top_k", type=int, default=0)
+    parser.add_argument("--top_p", type=float, default=0.0)
     
     return parser.parse_args()
 
@@ -107,7 +109,7 @@ def run_train(args):
     else:
         device = torch.device("cpu")
 
-    tokenizer, num_added_tokens, token_id_dict = get_tokenizer(config_dir=args.bert_dir)
+    tokenizer, num_added_tokens, token_id_dict = get_tokenizer(config_dir=args.config_dir)
     args.vocab_size = len(tokenizer)
     args.pad_token_id = token_id_dict["pad_token_id"]
     args.bos_token_id = token_id_dict["bos_token_id"]
@@ -115,35 +117,45 @@ def run_train(args):
     logging.info("{}: Add {} additional special tokens.".format(type(tokenizer).__name__, num_added_tokens))
     
     # define dataset
-    train_dataset = DialDataset(data_path=args.train_data, data_partition="train",
+    train_dataset = DialGPT2Dataset(data_path=args.train_data, data_partition="train",
         tokenizer=tokenizer, cache_dir=args.cache_dir, max_seq_len=args.max_seq_len, 
         turn_type_size=args.turn_type_size)
-    dev_dataset = DialDataset(data_path=args.dev_data, data_partition="dev",
+    dev_dataset = DialGPT2Dataset(data_path=args.dev_data, data_partition="dev",
         tokenizer=tokenizer, cache_dir=args.cache_dir, max_seq_len=args.max_seq_len, 
         turn_type_size=args.turn_type_size)
 
     # create dataloader
-    collator = DialCollator(device=device, padding_idx=args.pad_token_id)
+    collator = DialGPT2Collator(device=device, padding_idx=args.pad_token_id)
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=collator.custom_collate)
-    dev_loader = DataLoader(dev_dataset, batch_size=args.batch_size // 2, shuffle=False, collate_fn=collator.custom_collate)
+    dev_loader = DataLoader(dev_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collator.custom_collate)
 
     # build model
     if args.load_checkpoint is not None:
         model = torch.load(args.load_checkpoint)
     else:
-        model = TRIPDial(args=args)
+        model = TRIPDialGPT2(args=args)
     model.to(device)
     total_num = sum(p.numel() for p in model.parameters())
     trainable_num = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logging.info("Total parameters: {}\tTrainable parameters: {}".format(total_num, trainable_num))
     
+    '''
     # build trainer and execute model training
     trainer = Trainer(model=model, train_loader=train_loader, dev_loader=dev_loader,
         log_dir=args.log_dir, log_steps=args.log_steps, validate_steps=args.validate_steps, 
-        num_epochs=args.num_epochs, lr=args.lr, warm_up_ratio=args.warm_up_ratio,
-        weight_decay=args.weight_decay, max_grad_norm=args.max_grad_norm
+        num_epochs=args.num_epochs, lr=args.lr, warmup_ratio=args.warmup_ratio,
+        weight_decay=args.weight_decay, max_grad_norm=args.max_grad_norm,
+        gradient_accumulation_steps=args.gradient_accumulation_steps
     )
     trainer.train()
+    '''
+    # build trainer and execute model training
+    trainer = IgniteTrainer(model=model, 
+        train_loader=train_loader,
+        dev_loader=dev_loader,
+        args=args
+    )
+    trainer.run()
 
 
 def run_test(args):
@@ -152,7 +164,7 @@ def run_test(args):
         device = torch.device("cuda")
     else:
         device = torch.device("cpu")
-    
+
     if args.infer_checkpoint is not None:
         model_path = os.path.join(args.log_dir, args.infer_checkpoint)
     else:
@@ -166,7 +178,7 @@ def run_test(args):
     for param in model.parameters():
         param.requires_grad = False
 
-    tokenizer, _, token_id_dict = get_tokenizer(config_dir=args.bert_dir)
+    tokenizer, _, token_id_dict = get_tokenizer(config_dir=args.config_dir)
     args.pad_token_id = token_id_dict["pad_token_id"]
 
     # load data
@@ -176,11 +188,11 @@ def run_test(args):
     elif args.test_data.endswith("test_seen.json"):
         data_partition = "test_seen"
 
-    test_dataset = DialDataset(data_path=args.test_data, data_partition=data_partition,
+    test_dataset = DialGPT2Dataset(data_path=args.test_data, data_partition=data_partition,
         tokenizer=tokenizer, cache_dir=args.cache_dir, 
         max_seq_len=args.max_seq_len, turn_type_size=args.turn_type_size,
-        is_test=True, plan_path=args.plan_data_path)
-    collator = DialCollator(device=device, padding_idx=args.pad_token_id)
+        is_test=True, plan_path=args.plan_data)
+    collator = DialGPT2Collator(device=device, padding_idx=args.pad_token_id)
     test_loader = DataLoader(test_dataset, batch_size=args.test_batch_size, shuffle=False, collate_fn=collator.custom_collate)
     
     if not os.path.exists(args.output_dir):
@@ -191,10 +203,10 @@ def run_test(args):
     
     with open(output_path, 'w', encoding='utf-8') as f:
         for inputs in tqdm(test_loader):
+            # execute generation
             outputs = model.generate(args, inputs)
             # post-process
             resps = convert_ids_to_tokens(outputs["response"], tokenizer)
-            
             for resp in resps:
                 resp_obj = {"response": resp}
                 line = json.dumps(resp_obj, ensure_ascii=False)

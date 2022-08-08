@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-import logging
-import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
@@ -50,10 +48,7 @@ class TRIPDialGPT2(nn.Module):
             }
             self.controller = TransformerDecoder(**args_controller)
             if args.share_embedding:
-                # share?
-                #embeds = self.lm_decoder.get_input_embeddings()
-                #self.controller.set_input_embeddings(embeds)
-                # copy?
+                # share embedding by deep copy
                 embeds = self.lm_decoder.get_input_embeddings()
                 self.controller.embed_tokens.weight.data.copy_(embeds.weight.clone().detach())
 
@@ -93,8 +88,8 @@ class TRIPDialGPT2(nn.Module):
         ctrl_mask,
         unpert_hidden,
         unpert_logits,
-        stepsize=0.03,
-        num_iterations=3,
+        stepsize=0.01,
+        num_iterations=1,
         gamma=1.5,
         bow_scale=0.01,
         ce_scale=1,
@@ -154,9 +149,9 @@ class TRIPDialGPT2(nn.Module):
             bow_loss = -1 * torch.sum(one_hot_bows * log_probs, 1)
             bow_loss = bow_loss.sum()
             loss += bow_scale * bow_loss
-            '''
+            
             # compute controller loss
-            con_hidden = torch.cat([unpert_hidden[:, :-1, :], pert_hidden], dim=1).detach()
+            con_hidden = torch.cat([unpert_hidden[:, :-1, :], pert_hidden], dim=1)
 
             ctrl_output = self.controller(
                 input_ids=ctrl_input_ids,
@@ -171,7 +166,7 @@ class TRIPDialGPT2(nn.Module):
             ce_criterion = nn.CrossEntropyLoss()
             ce_loss = ce_criterion(ctrl_logits.view(-1, self.vocab_size), ctrl_gold_ids.view(-1))
             loss += ce_scale * ce_loss
-            '''
+            
 
             if kl_scale > 0:
                 unpert_probs = F.softmax(unpert_logits[:, -1, :], dim=-1)

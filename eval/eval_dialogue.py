@@ -37,7 +37,7 @@ def calc_succ(eval_fp, gold_fp):
             # eval this turn
             eval_action = gold_sample["target"][0]
             eval_topic = gold_sample["target"][1]
-            #print("gold: {}  pred: {}".format(gold_sample["response"], eval_sample["response"]))
+
             topic_total += 1
             if eval_topic.lower() in eval_sample["response"].lower():
                 topic_hit += 1
@@ -214,12 +214,6 @@ if __name__ == "__main__":
     preds = load_data(args.eval_file)
     refs, all_knowledges, ref_knowlwedges = load_data(args.gold_file, is_gold=True)
     assert len(preds) == len(refs)
-    ################
-    #for pred, ref, ref_kd in zip(preds, refs, ref_knowlwedges):
-    #    print("pred: ", "".join(pred))
-    #    print("gold: ", "".join(ref))
-    #    print("gold_kd: ", ref_kd)
-    #    print("\n")
 
     # calculate f1
     f1 = calc_f1(preds, refs)

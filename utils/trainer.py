@@ -28,7 +28,7 @@ class Trainer(object):
             validate_steps, 
             num_epochs, 
             lr, 
-            warm_up_ratio=0.1, 
+            warmup_ratio=0.1, 
             weight_decay=0.01, 
             max_grad_norm=1.0,
             gradient_accumulation_steps=0
@@ -42,7 +42,7 @@ class Trainer(object):
         self.validate_steps = validate_steps
         self.num_epochs = num_epochs
         self.lr = lr
-        self.warm_up_ratio = warm_up_ratio
+        self.warmup_ratio = warmup_ratio
         self.weight_decay = weight_decay
         self.max_grad_norm = max_grad_norm
         self.gradient_accumulation_steps = gradient_accumulation_steps
@@ -50,7 +50,7 @@ class Trainer(object):
         total_steps = len(train_loader) * self.num_epochs
         self.optimizer = AdamW(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
         self.scheduler = get_linear_schedule_with_warmup(optimizer=self.optimizer, 
-            num_warmup_steps=self.warm_up_ratio * total_steps, 
+            num_warmup_steps=self.warmup_ratio * total_steps, 
             num_training_steps=total_steps)
         self.best_metric = 0.0
 
@@ -126,13 +126,14 @@ class Trainer(object):
         
         accs = []
         loss = []
-        for inputs in tqdm(loader):
-            output = self.model(inputs)
-            accs.append(output["acc"])
-            if self.gradient_accumulation_steps > 0:
-                loss.append(float(output["loss"]) / self.gradient_accumulation_steps)
-            else:
-                loss.append(float(output["loss"]))
+        with torch.no_grad():
+            for inputs in tqdm(loader):
+                output = self.model(inputs)
+                accs.append(output["acc"])
+                if self.gradient_accumulation_steps > 0:
+                    loss.append(float(output["loss"]) / self.gradient_accumulation_steps)
+                else:
+                    loss.append(float(output["loss"]))
         avg_acc = np.mean(accs)
         avg_loss = np.mean(loss)
         
