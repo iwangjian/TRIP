@@ -32,10 +32,10 @@ def parse_config():
     parser.add_argument('--use_gpu', type=str2bool, default="True")
 
     # data config
+    parser.add_argument('--lang', type=str, choices=["zh", "en"])
     parser.add_argument('--train_data', type=str, default=None)
     parser.add_argument('--dev_data', type=str, default=None)
     parser.add_argument('--test_data', type=str, default=None)
-    parser.add_argument('--bert_dir', type=str, default="config/bert-base-chinese")
     parser.add_argument('--cache_dir', type=str, default="caches/plan/")
     parser.add_argument('--log_dir', type=str, default="logs/plan/")
     
@@ -109,6 +109,12 @@ def run_train(args):
         device = torch.device("cuda")
     else:
         device = torch.device("cpu")
+    if args.lang == "zh":
+        # ref https://huggingface.co/bert-base-chinese
+        args.bert_dir = "bert-base-chinese"
+    else:
+        # ref https://huggingface.co/bert-base-uncased
+        args.bert_dir = "bert-base-uncased"  # TODO: how about cased??
 
     tokenizer, num_added_tokens, token_id_dict = get_tokenizer(config_dir=args.bert_dir)
     args.vocab_size = len(tokenizer)
@@ -165,6 +171,13 @@ def run_test(args):
     model.to(device)
     model.eval()
 
+    if args.lang == "zh":
+        # ref https://huggingface.co/bert-base-chinese
+        args.bert_dir = "bert-base-chinese"
+    else:
+        # ref https://huggingface.co/bert-base-uncased
+        args.bert_dir = "bert-base-uncased"  # TODO: how about cased??
+
     tokenizer, _, token_id_dict = get_tokenizer(config_dir=args.bert_dir)
     args.pad_token_id = token_id_dict["pad_token_id"]
 
@@ -192,8 +205,8 @@ def run_test(args):
             with torch.no_grad():
                 outputs = model.generate(args, inputs)
                 # post-process
-                backward_plans = convert_ids_to_tokens(outputs["backward_plan"], tokenizer)
-                beam_backward_plans = convert_ids_to_tokens(outputs["beam_backward_plan"], tokenizer)
+                backward_plans = convert_ids_to_tokens(outputs["backward_plan"], tokenizer, lang=args.lang)
+                beam_backward_plans = convert_ids_to_tokens(outputs["beam_backward_plan"], tokenizer, lang=args.lang)
                 #beam_forward_plans = convert_ids_to_tokens(outputs["beam_forward_plan"], tokenizer)
                 assert len(backward_plans) == len(beam_backward_plans)
                 

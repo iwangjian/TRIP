@@ -31,11 +31,11 @@ def parse_config():
     parser.add_argument('--use_gpu', type=str2bool, default="True")
 
     # data config
+    parser.add_argument('--lang', type=str, choices=["zh", "en"])
     parser.add_argument('--train_data', type=str, default=None)
     parser.add_argument('--dev_data', type=str, default=None)
     parser.add_argument('--test_data', type=str, default=None)
     parser.add_argument('--plan_data', type=str, default=None)
-    parser.add_argument('--config_dir', type=str, default="uer/gpt2-chinese-cluecorpussmall")
     parser.add_argument('--cache_dir', type=str, default="caches/dial/")
     parser.add_argument('--log_dir', type=str, default="logs/dial/")
     parser.add_argument('--max_seq_len', type=int, default=512)
@@ -108,8 +108,15 @@ def run_train(args):
         device = torch.device("cuda")
     else:
         device = torch.device("cpu")
-
-    tokenizer, num_added_tokens, token_id_dict = get_tokenizer(config_dir=args.config_dir)
+    if args.lang == "zh":
+        # BertTokenizer is used for Chinese GPT-2 model
+        # ref https://huggingface.co/uer/gpt2-chinese-cluecorpussmall
+        args.config_dir = "uer/gpt2-chinese-cluecorpussmall"
+        tokenizer, num_added_tokens, token_id_dict = get_tokenizer(config_dir=args.config_dir, name="bert")
+    else:
+        # ref https://huggingface.co/gpt2
+        args.config_dir = "gpt2"
+        tokenizer, num_added_tokens, token_id_dict = get_tokenizer(config_dir=args.config_dir, name="gpt2")
     args.vocab_size = len(tokenizer)
     args.pad_token_id = token_id_dict["pad_token_id"]
     args.bos_token_id = token_id_dict["bos_token_id"]
@@ -177,8 +184,14 @@ def run_test(args):
     # freeze model weights
     for param in model.parameters():
         param.requires_grad = False
-
-    tokenizer, _, token_id_dict = get_tokenizer(config_dir=args.config_dir)
+    
+    if args.lang == "zh":
+        # BertTokenizer is used for Chinese GPT-2 model
+        # ref https://huggingface.co/uer/gpt2-chinese-cluecorpussmall
+        tokenizer, _, token_id_dict = get_tokenizer(config_dir=args.config_dir, name="bert")
+    else:
+        tokenizer, _, token_id_dict = get_tokenizer(config_dir=args.config_dir, name="gpt2")
+    
     args.pad_token_id = token_id_dict["pad_token_id"]
 
     # load data

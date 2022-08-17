@@ -42,19 +42,20 @@ def calc_succ(eval_fp, gold_fp):
             if eval_topic.lower() in eval_sample["response"].lower():
                 topic_hit += 1
             
-            if eval_action == "电影推荐":
+            if eval_action == "电影推荐" or eval_action == "Movie recommendation":
                 movie_total += 1
                 if eval_topic.lower() in eval_sample["response"].lower():
                     movie_hit += 1
-            elif eval_action == "音乐推荐" or eval_action == "播放音乐":
+            elif eval_action == "音乐推荐" or eval_action == "播放音乐" \
+                or eval_action == "Music recommendation" or eval_action == "Play music":
                 music_total += 1
                 if eval_topic.lower() in eval_sample["response"].lower():
                     music_hit += 1
-            elif eval_action == "兴趣点推荐":
+            elif eval_action == "兴趣点推荐" or eval_action == "POI recommendation":
                 poi_total += 1
                 if eval_topic.lower() in eval_sample["response"].lower():
                     poi_hit += 1
-            elif eval_action == "美食推荐":
+            elif eval_action == "美食推荐" or eval_action == "Food recommendation":
                 food_total += 1
                 if eval_topic.lower() in eval_sample["response"].lower():
                     food_hit += 1
@@ -71,13 +72,11 @@ def calc_succ(eval_fp, gold_fp):
 
 
 def calc_f1(hyps, refs):
-    """ Calculate char-level f1 score """
+    """ Calculate word-level f1 score """
     golden_char_total = 0.0
     pred_char_total = 0.0
     hit_char_total = 0.0
     for response, golden_response in zip(hyps, refs):
-        golden_response = "".join(golden_response)
-        response = "".join(response)
         common = Counter(response) & Counter(golden_response)
         hit_char_total += sum(common.values())
         golden_char_total += len(golden_response)
@@ -134,19 +133,18 @@ def calc_distinct(seqs):
     return (intra_dist1, intra_dist2, inter_dist1, inter_dist2)
 
 
-def calc_knowledge_f1(hyps, knowledge_refs, knowledge_alls):
+def calc_knowledge_f1(lang, hyps, knowledge_refs, knowledge_alls):
     """" Calculate knowledge f1 score """
     golden_total = 0.0
     pred_total = 0.0
     hit_total = 0.0
     for response, golden_kd, all_kd in zip(hyps, knowledge_refs, knowledge_alls):
-        response = "".join(response)
         golden_total += len(golden_kd)
         for kd in golden_kd:
-            if is_knowledge_hit(response, kd):
+            if is_knowledge_hit(lang, response, kd):
                 hit_total += 1
         for kd in all_kd:
-            if is_knowledge_hit(response, kd):
+            if is_knowledge_hit(lang, response, kd):
                 pred_total += 1
     p = hit_total / pred_total if pred_total > 0 else 0
     r = hit_total / golden_total if golden_total > 0 else 0
@@ -154,13 +152,22 @@ def calc_knowledge_f1(hyps, knowledge_refs, knowledge_alls):
     return f1
 
 
-def is_knowledge_hit(utterance, kg_obj, threshold=0.55):
+def is_knowledge_hit(lang, utterance_toks, kg_obj, threshold=0.55):
+    if lang == "zh":
+        utterance = "".join(utterance_toks)
+    else:
+        utterance = " ".join(utterance_toks)
     flag = False
     if kg_obj in utterance:
         flag = True
     else:
+        if lang == "zh":
+            # Chinese char-level
+            common = Counter(utterance) & Counter(kg_obj)
+        else:
+            # English word-level
+            common = Counter(utterance.split()) & Counter(kg_obj.split())
         # knowledge recall
-        common = Counter(utterance) & Counter(kg_obj)
         hit_char_total = sum(common.values())
         golden_char_total = len(kg_obj)
         recall = hit_char_total / golden_char_total if golden_char_total > 0 else 0
@@ -168,7 +175,7 @@ def is_knowledge_hit(utterance, kg_obj, threshold=0.55):
             flag = True
     return flag
 
-def label_knowledge(utterance, kg_list, lower_case=True):
+def label_knowledge(lang, utterance_toks, kg_list, lower_case=True):
     gold_knowledge = []
     all_objs = set()
     for triple in kg_list:
@@ -176,27 +183,33 @@ def label_knowledge(utterance, kg_list, lower_case=True):
         all_objs.add(triple[0].lower() if lower_case else triple[0])
         all_objs.add(triple[2].lower() if lower_case else triple[2])
     for obj in all_objs:
-        if is_knowledge_hit(utterance, obj):
+        if is_knowledge_hit(lang, utterance_toks, obj):
             gold_knowledge.append(obj)
     all_objs = list(all_objs)
     return all_objs, gold_knowledge
 
 
-def load_data(fp, is_gold=False, lower_case=True):
+def load_data(fp, lang, is_gold=False, lower_case=True):
     samples = []
     all_knowledges = []
     gold_knowledges = []
     with open(fp, 'r', encoding='utf-8') as fr:
-        for line in fr:
+        for idx, line in enumerate(fr):
             sample = json.loads(line)
             response = sample["response"].lower() if lower_case else sample["response"]
-            resp = [tok for tok in response]   # token-level list
-            samples.append(resp)
+            if lang == "zh":
+                # Chinese char-level
+                sentence_toks = [tok for tok in response]
+            else:
+                # English word-level
+                sentence_toks = list(response.split())
+            samples.append(sentence_toks)
             if is_gold:
                 knowledge = sample["knowledge"]
-                all, gold = label_knowledge(response, knowledge, lower_case=lower_case)
-                all_knowledges.append(all)
-                gold_knowledges.append(gold)
+                alls, golds= label_knowledge(lang, sentence_toks, knowledge, lower_case=lower_case)
+                all_knowledges.append(alls)
+                gold_knowledges.append(golds)
+            
     if is_gold:
         assert len(samples) == len(all_knowledges)
         assert len(samples) == len(gold_knowledges)
@@ -207,12 +220,13 @@ def load_data(fp, is_gold=False, lower_case=True):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--lang", type=str, choices=["zh", "en"])
     parser.add_argument("--eval_file", type=str)
     parser.add_argument("--gold_file", type=str)
     args = parser.parse_args()
 
-    preds = load_data(args.eval_file)
-    refs, all_knowledges, ref_knowlwedges = load_data(args.gold_file, is_gold=True)
+    preds = load_data(args.eval_file, args.lang)
+    refs, all_knowledges, ref_knowlwedges = load_data(args.gold_file, args.lang, is_gold=True)
     assert len(preds) == len(refs)
 
     # calculate f1
@@ -225,7 +239,7 @@ if __name__ == "__main__":
     _, _, inter_dist1, inter_dist2 = calc_distinct(preds)
 
     # calculate knowledge-F1
-    kg_f1 = calc_knowledge_f1(preds, ref_knowlwedges, all_knowledges)
+    kg_f1 = calc_knowledge_f1(args.lang, preds, ref_knowlwedges, all_knowledges)
 
     output_str = "F1: %.2f%%\n" % (f1 * 100)
     output_str += "BLEU1: %.3f\n" % bleu1
