@@ -10,7 +10,9 @@ def load_labels(fp, lower_case=True):
     labels = {}
     with open(fp, 'r', encoding='utf-8') as fr:
         for idx, item in enumerate(fr):
-            k = item.strip().lower() if lower_case else item.strip()
+            k = "".join(item.strip().split())   # concat all chars
+            if lower_case:
+                k = k.lower()
             labels[k] = idx
     labels["None"] = -1
     return labels
@@ -43,8 +45,8 @@ def load_eval_data(eval_fp, label_action_fp, label_topic_fp, lower_case=True):
     with open(eval_fp, 'r', encoding='utf-8') as fr:
         for line in fr:
             sample = json.loads(line)
-            act = sample["action"].strip()
-            topic = sample["topic"].strip()
+            act = "".join(sample["action"].strip().split())   # concat all action chars
+            topic = "".join(sample["topic"].strip().split())  # concat all topic chars
             if lower_case:
                 act = act.lower()
                 topic = topic.lower()
@@ -68,8 +70,8 @@ def load_gold_data(gold_fp, label_action_fp, label_topic_fp, lower_case=True):
         for line in fr:
             sample = json.loads(line)
             ids.append(int(sample["id"]))
-            act = sample["action_path"][0].strip()
-            topic = sample["topic_path"][0].strip()
+            act = "".join(sample["action_path"][0].strip().split())   # concat all action chars
+            topic = "".join(sample["topic_path"][0].strip().split())  # concat all topic chars
             if lower_case:
                 act = act.lower()
                 topic = topic.lower()
