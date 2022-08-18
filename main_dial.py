@@ -188,8 +188,11 @@ def run_test(args):
     if args.lang == "zh":
         # BertTokenizer is used for Chinese GPT-2 model
         # ref https://huggingface.co/uer/gpt2-chinese-cluecorpussmall
+        args.config_dir = "uer/gpt2-chinese-cluecorpussmall"
         tokenizer, _, token_id_dict = get_tokenizer(config_dir=args.config_dir, name="bert")
     else:
+        # ref https://huggingface.co/gpt2
+        args.config_dir = "gpt2"
         tokenizer, _, token_id_dict = get_tokenizer(config_dir=args.config_dir, name="gpt2")
     
     args.pad_token_id = token_id_dict["pad_token_id"]
