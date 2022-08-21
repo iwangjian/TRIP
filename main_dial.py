@@ -125,10 +125,12 @@ def run_train(args):
     
     # define dataset
     train_dataset = DialGPT2Dataset(data_path=args.train_data, data_partition="train",
-        tokenizer=tokenizer, cache_dir=args.cache_dir, max_seq_len=args.max_seq_len, 
+        tokenizer=tokenizer, special_tokens_dict=token_id_dict,
+        cache_dir=args.cache_dir, max_seq_len=args.max_seq_len, 
         turn_type_size=args.turn_type_size)
     dev_dataset = DialGPT2Dataset(data_path=args.dev_data, data_partition="dev",
-        tokenizer=tokenizer, cache_dir=args.cache_dir, max_seq_len=args.max_seq_len, 
+        tokenizer=tokenizer, special_tokens_dict=token_id_dict,
+        cache_dir=args.cache_dir, max_seq_len=args.max_seq_len, 
         turn_type_size=args.turn_type_size)
 
     # create dataloader
@@ -205,7 +207,7 @@ def run_test(args):
         data_partition = "test_seen"
 
     test_dataset = DialGPT2Dataset(data_path=args.test_data, data_partition=data_partition,
-        tokenizer=tokenizer, cache_dir=args.cache_dir, 
+        tokenizer=tokenizer, special_tokens_dict=token_id_dict, cache_dir=args.cache_dir, 
         max_seq_len=args.max_seq_len, turn_type_size=args.turn_type_size,
         is_test=True, plan_path=args.plan_data)
     collator = DialGPT2Collator(device=device, padding_idx=args.pad_token_id)

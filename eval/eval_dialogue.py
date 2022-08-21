@@ -4,11 +4,12 @@ import argparse
 import json
 import numpy as np
 from collections import Counter
+import nltk
 from nltk.translate import bleu_score
 from nltk.translate.bleu_score import SmoothingFunction
 
 
-def calc_succ(eval_fp, gold_fp):
+def calc_succ(lang, eval_fp, gold_fp):
     all_eval, all_gold = [], []
     with open(eval_fp, 'r', encoding='utf-8') as fr:
         for line in fr:
@@ -31,33 +32,37 @@ def calc_succ(eval_fp, gold_fp):
     movie_total, music_total, poi_total, food_total = 0, 0, 0, 0
     
     for eval_sample, gold_sample in zip(all_eval, all_gold):
-        if gold_sample["action_path"][0] == gold_sample["target"][0] and \
-            gold_sample["topic_path"][0] == gold_sample["target"][1] and \
+        if gold_sample["action_path"][0].lower() == gold_sample["target"][0].lower() and \
+            gold_sample["topic_path"][0].lower() == gold_sample["target"][1].lower() and \
                 gold_sample["target"][1].lower() in gold_sample["response"].lower():
             # eval this turn
+            topic_total += 1
             eval_action = gold_sample["target"][0]
             eval_topic = gold_sample["target"][1]
-
-            topic_total += 1
-            if eval_topic.lower() in eval_sample["response"].lower():
+            eval_response = eval_sample["response"]
+            if lang == "en":
+                eval_topic = " ".join(nltk.word_tokenize(eval_topic))
+                eval_response = " ".join(nltk.word_tokenize(eval_response))
+            
+            if eval_topic.lower() in eval_response.lower():
                 topic_hit += 1
             
             if eval_action == "电影推荐" or eval_action == "Movie recommendation":
                 movie_total += 1
-                if eval_topic.lower() in eval_sample["response"].lower():
+                if eval_topic.lower() in eval_response.lower():
                     movie_hit += 1
             elif eval_action == "音乐推荐" or eval_action == "播放音乐" \
                 or eval_action == "Music recommendation" or eval_action == "Play music":
                 music_total += 1
-                if eval_topic.lower() in eval_sample["response"].lower():
+                if eval_topic.lower() in eval_response.lower():
                     music_hit += 1
             elif eval_action == "兴趣点推荐" or eval_action == "POI recommendation":
                 poi_total += 1
-                if eval_topic.lower() in eval_sample["response"].lower():
+                if eval_topic.lower() in eval_response.lower():
                     poi_hit += 1
             elif eval_action == "美食推荐" or eval_action == "Food recommendation":
                 food_total += 1
-                if eval_topic.lower() in eval_sample["response"].lower():
+                if eval_topic.lower() in eval_response.lower():
                     food_hit += 1
     succ_rate = float(topic_hit) / topic_total
     movie_rec_sr = float(movie_hit) / movie_total
@@ -202,14 +207,13 @@ def load_data(fp, lang, is_gold=False, lower_case=True):
                 sentence_toks = [tok for tok in response]
             else:
                 # English word-level
-                sentence_toks = list(response.split())
+                sentence_toks = nltk.word_tokenize(response)
             samples.append(sentence_toks)
             if is_gold:
                 knowledge = sample["knowledge"]
                 alls, golds= label_knowledge(lang, sentence_toks, knowledge, lower_case=lower_case)
                 all_knowledges.append(alls)
                 gold_knowledges.append(golds)
-            
     if is_gold:
         assert len(samples) == len(all_knowledges)
         assert len(samples) == len(gold_knowledges)
@@ -251,4 +255,4 @@ if __name__ == "__main__":
     print(output_str)
 
     # calculate target success rate
-    calc_succ(args.eval_file, args.gold_file)
+    calc_succ(args.lang, args.eval_file, args.gold_file)
