@@ -115,7 +115,7 @@ class TRIPDialGPT2(nn.Module):
         ctrl_attn_masks = ctrl_mask[:, :-1] if ctrl_mask is not None else None
         ctrl_gold_ids = ctrl_ids[:, 1:]
         ctrl_gold_ids = ctrl_gold_ids.masked_fill(
-            ctrl_gold_ids == self.pad_token_id, -100  # default: ignore index -100 
+            ctrl_gold_ids == self.pad_token_id, -100
         )   
 
         # init perturbed past
@@ -233,7 +233,7 @@ class TRIPDialGPT2(nn.Module):
             )
             lm_hidden = lm_output["hidden_states"][-1]
             lm_logits = lm_output["logits"]
-            
+
             if self.use_control:
                 control_ids  = batch["control_ids"]
                 control_masks = batch["control_masks"]
@@ -269,9 +269,14 @@ class TRIPDialGPT2(nn.Module):
         else:
             input_ids = batch["input_ids"]
             lm_labels = batch["lm_labels"]
-            lm_labels = lm_labels.masked_fill(lm_labels == self.pad_token_id, -100)   # default: ignore index -100
+            lm_labels = lm_labels.masked_fill(lm_labels == self.pad_token_id, -100)
             label_masks = lm_labels.masked_fill(lm_labels == -100, 0)
             label_masks = label_masks.masked_fill(label_masks > 0, 1)
+            #print("input_ids: ", input_ids.size())
+            #print(input_ids)
+            #print("lm_labels: ", lm_labels.size())
+            #print(lm_labels)
+            #print("label_masks: ", label_masks)
 
             # run LM model
             lm_output = self.lm_decoder(
@@ -296,7 +301,7 @@ class TRIPDialGPT2(nn.Module):
                 ctrl_input_ids = control_ids[:, :-1]
                 ctrl_attn_masks = control_masks[:, :-1] if control_masks is not None else None
                 ctrl_gold_ids = control_ids[:, 1:]
-                ctrl_gold_ids = ctrl_gold_ids.masked_fill(ctrl_gold_ids == self.pad_token_id, -100)    # default: ignore index -100
+                ctrl_gold_ids = ctrl_gold_ids.masked_fill(ctrl_gold_ids == self.pad_token_id, -100)
 
                 # run controller
                 ctrl_output = self.controller(

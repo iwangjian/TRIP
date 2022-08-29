@@ -114,7 +114,7 @@ def run_train(args):
         args.bert_dir = "bert-base-chinese"
     else:
         # ref https://huggingface.co/bert-base-uncased
-        args.bert_dir = "bert-base-uncased"  # TODO: how about cased??
+        args.bert_dir = "bert-base-uncased"
 
     tokenizer, num_added_tokens, token_id_dict = get_tokenizer(config_dir=args.bert_dir)
     args.vocab_size = len(tokenizer)
@@ -176,7 +176,7 @@ def run_test(args):
         args.bert_dir = "bert-base-chinese"
     else:
         # ref https://huggingface.co/bert-base-uncased
-        args.bert_dir = "bert-base-uncased"  # TODO: how about cased??
+        args.bert_dir = "bert-base-uncased"
 
     tokenizer, _, token_id_dict = get_tokenizer(config_dir=args.bert_dir)
     args.pad_token_id = token_id_dict["pad_token_id"]
@@ -216,8 +216,7 @@ def run_test(args):
                     plan = {
                         "action": action,
                         "topic": topic,
-                        "plan_path": plan_path,
-                        "backward_plan": bp
+                        "plan_path": plan_path
                     }
                     line = json.dumps(plan, ensure_ascii=False)
                     f.write(line + "\n")

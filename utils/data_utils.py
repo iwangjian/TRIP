@@ -1,11 +1,8 @@
-# -*- coding: utf-8 -*-
-import os
-import json
-from transformers import BertTokenizer
+# -*- coding: utf-8 -*-UNK
+from transformers import BertTokenizer, GPT2Tokenizer
 
 PAD = "[PAD]"     # consistent with Bert tokenizer
 UNK = "[UNK]"     # consistent with Bert tokenizer
-CLS = "[CLS]"     # consistent with Bert tokenizer
 SEP = "[SEP]"     # consistent with Bert tokenizer
 
 ACT = "[A]"       # denote an action
@@ -13,21 +10,32 @@ TPC = "[T]"       # denote a topic
 BOS = "[BOS]"     # begin of sequence
 EOS = "[EOS]"     # end of sequence
 
-SPECIAL_TOKENS_MAP = {"additional_special_tokens": [ACT, TPC, BOS, EOS]}
+IGNORE_INDEX = -100    # default in CrossEntropyLoss
 
 
-def get_tokenizer(config_dir):
-    tokenizer = BertTokenizer.from_pretrained(config_dir)
-    num_added_tokens = tokenizer.add_special_tokens(SPECIAL_TOKENS_MAP)
-    special_token_id_dict = {
-        "pad_token_id": tokenizer.pad_token_id,
-        "bos_token_id": tokenizer.convert_tokens_to_ids(BOS),
-        "eos_token_id": tokenizer.convert_tokens_to_ids(EOS),
-    }
+def get_tokenizer(config_dir, name="bert"):
+    if name == "gpt2":
+        tokenizer = GPT2Tokenizer.from_pretrained(config_dir)
+        special_token_map = {"additional_special_tokens": [ACT, TPC, SEP, PAD]}
+        num_added_tokens = tokenizer.add_special_tokens(special_token_map)
+        special_token_id_dict = {
+            "pad_token_id": tokenizer.convert_tokens_to_ids(PAD),
+            "bos_token_id": tokenizer.bos_token_id,
+            "eos_token_id": tokenizer.eos_token_id,
+        }
+    else:
+        tokenizer = BertTokenizer.from_pretrained(config_dir)
+        special_token_map = {"additional_special_tokens": [ACT, TPC, BOS, EOS]}
+        num_added_tokens = tokenizer.add_special_tokens(special_token_map)
+        special_token_id_dict = {
+            "pad_token_id": tokenizer.pad_token_id,
+            "bos_token_id": tokenizer.convert_tokens_to_ids(BOS),
+            "eos_token_id": tokenizer.convert_tokens_to_ids(EOS),
+        }
     return tokenizer, num_added_tokens, special_token_id_dict
 
 
-def convert_ids_to_tokens(output, tokenizer):
+def convert_ids_to_tokens(output, tokenizer, lang="en"):
     sentences = []
     for idx in range(output.size(0)):
         decode_tokens = tokenizer.decode(output[idx, :]).split()
@@ -37,11 +45,23 @@ def convert_ids_to_tokens(output, tokenizer):
                 continue
             elif token == EOS or token == PAD:
                 break
+            elif token.startswith(EOS):
+                break
+            elif token.endswith(EOS):
+                return_tokens.append(token.replace(EOS, ""))
+                break
+            elif token.endswith("<|endoftext|>"):
+                return_tokens.append(token.replace("<|endoftext|>", ""))
+                break
             elif token.upper() == "NULL":
                 return_tokens.append("NULL")
             else:
                 return_tokens.append(token)
-        sentences.append("".join(return_tokens))
+        if lang == "zh":
+            return_str = "".join(return_tokens)
+        else:
+            return_str = " ".join(return_tokens)
+        sentences.append(return_str)
     return sentences
 
 

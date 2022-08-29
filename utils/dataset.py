@@ -9,9 +9,7 @@ from dataclasses import dataclass
 from typing import List
 from torch.utils.data import Dataset
 from tqdm import tqdm
-from utils.data_utils import CLS, SEP, ACT, TPC, BOS, EOS
-
-IGNORE_INDEX = -100
+from utils.data_utils import SEP, ACT, TPC, BOS, EOS, IGNORE_INDEX
 
 
 @dataclass(frozen=True)
@@ -34,25 +32,6 @@ class InputFeature:
     backward_tgt_masks: List[int]
     backward_neg_ids: List[List[int]]
     backward_neg_masks: List[List[int]]
-
-    def to_json_string(self):
-        """Serialize this instance to a JSON string."""
-        return json.dumps(dataclasses.asdict(self)) + "\n"
-
-
-@dataclass(frozen=True)
-class DialInputFeature:
-    """
-    A single set of features of data for dialogue generation.
-    Property names are the same names as the corresponding inputs to a model.
-    """
-    context_input_ids: List[int]
-    context_seg_ids: List[int]
-    plan_input_ids: List[int]
-    plan_seg_ids: List[int]
-    
-    control_ids: List[int]
-    response_ids: List[int]
 
     def to_json_string(self):
         """Serialize this instance to a JSON string."""
@@ -148,7 +127,7 @@ class PlanDataset(Dataset):
                 tgt_ids, tgt_segs = self._parse_input_target(sample)
                 forward_plan_ids, forward_tgt_masks, forward_neg_ids, forward_neg_masks, \
                     backward_plan_ids, backward_tgt_masks, backward_neg_ids, backward_neg_masks = self._parse_output_plan(sample)
-                #constrain_action_ids, constrain_topic_ids = self._parse_constraints(sample, vocab_action_path, vocab_topic_path)
+                
                 inputs = {
                     "context_input_ids": ctx_ids,
                     "context_seg_ids": ctx_segs,
@@ -182,13 +161,15 @@ class PlanDataset(Dataset):
             profile_segs = profile_segs + len(k_toks)*[0] + len(v_toks)*[0]
         profile_tokens = profile_tokens + [SEP]
         profile_segs = profile_segs + [1]
+        #print("profile_tokens: ", profile_tokens)
 
         # domain knowledge
         kg_tokens, kg_segs = [], []
         for kg in sample["knowledge"]:
-            kg_tok = self.tokenizer.tokenize("".join(kg))
+            kg_tok = self.tokenizer.tokenize(" ".join(kg))
             kg_tokens = kg_tokens + kg_tok + [SEP]
             kg_segs = kg_segs + len(kg_tok)*[0] + [1]
+        #print("kg_tokens: ", kg_tokens)
 
         # dialogue history
         conv_tokens, conv_segs = [], []
@@ -201,6 +182,8 @@ class PlanDataset(Dataset):
             conv_segs = conv_segs + len(h_toks)*[0]
         conv_tokens = conv_tokens + [SEP]
         conv_segs = conv_segs + [1]
+        #print("conv_tokens: ", conv_tokens)
+        #print("")
         
         # concat as context
         ctx_tokens =  conv_tokens + kg_tokens + profile_tokens
@@ -237,8 +220,10 @@ class PlanDataset(Dataset):
                 else:
                     candidates.add(subj)
             # TODO: revise negative sampling
-            if rel == "演唱":
-                if obj != target_topic:
+            if obj != target_topic:
+                if obj in plan_str:
+                    path_topics.add(obj)
+                else:
                     candidates.add(obj)
             
         if len(candidates) < self.num_negatives:
@@ -335,40 +320,6 @@ class PlanDataset(Dataset):
         
         return (forward_plan_ids, forward_tgt_masks, forward_neg_ids, forward_neg_masks, \
             backward_plan_ids, backward_tgt_masks, backward_neg_ids, backward_neg_masks)
-    
-    '''
-    def _parse_constraints(self, sample: dict, vocab_action_path=None, vocab_topic_path=None):
-        if self.is_test:
-            if vocab_action_path is None or vocab_topic_path is None:
-                raise ValueError("`vocab_action_path` and `vocab_topic_path` should be provided during test phrase!")
-            
-            constrain_actions = self._read_vocab(vocab_action_path)
-            constrain_action_ids = []
-            for act in constrain_actions:
-                toks = self.tokenizer.tokenize(act)
-                ids = self.tokenizer.convert_tokens_to_ids(toks)
-                constrain_action_ids.append(list(ids))
-
-            constrain_topics = ["NULL"]
-            all_topics = self._read_vocab(vocab_topic_path)
-            for kg in sample["knowledge"]:
-                s, p, o = kg
-                if s in all_topics:
-                    constrain_topics.append(s)
-                if o in all_topics:
-                    constrain_topics.append(o)
-            constrain_topics = list(set(constrain_topics))
-            constrain_topic_ids = []
-            for tpc in constrain_topics:
-                toks = self.tokenizer.tokenize(tpc)
-                ids = self.tokenizer.convert_tokens_to_ids(toks)
-                constrain_topic_ids.append(list(ids))
-        else:
-            constrain_action_ids, constrain_topic_ids = [], []
-        
-        return (constrain_action_ids, constrain_topic_ids)
-    '''
-    
 
     @staticmethod
     def _get_forward_path(action_path: list, topic_path: list, target_action: str, target_topic: str):
@@ -434,7 +385,7 @@ class PlanDataset(Dataset):
             if end_idx == -1:
                 end_idx = len(path_tokens)
             for idx in range(0, end_idx):
-                position_mask[idx] = 1   # 1: should be computed for target contrast
+                position_mask[idx] = 1   # should be computed for contrastive generation
         else:
             start_idx = len(path_tokens)
             while start_idx >= 0:
@@ -442,7 +393,7 @@ class PlanDataset(Dataset):
                 if path_tokens[start_idx] == ACT:
                     break
             for idx in range(start_idx, len(path_tokens)):
-                position_mask[idx] = 1   # 1: should be computed for target contrast
+                position_mask[idx] = 1   # should be computed for contrastive generation
         return position_mask
 
     @staticmethod
@@ -460,293 +411,6 @@ class PlanDataset(Dataset):
         return self.instances[index]
 
 
-class DialDataset(Dataset):
-    """
-    Self-defined DialDataset class for dialogue generation.
-    Args:
-        Dataset ([type]): [description]
-    """
-    def __init__(self, 
-        data_path,  
-        data_partition,
-        tokenizer,
-        cache_dir=None, 
-        max_seq_len=512,
-        turn_type_size=16,
-        is_test=False,
-        plan_path=None
-    ):
-        self.data_partition = data_partition
-        self.tokenizer = tokenizer
-        self.cache_dir = cache_dir
-        self.max_seq_len = max_seq_len
-        self.turn_type_size = turn_type_size
-        self.is_test = is_test
-        
-        self.instances = []
-        self._cache_instances(data_path, plan_path)
-
-    def _cache_instances(self, data_path, plan_path=None):
-        """
-        Load data tensors into memory or create the dataset when it does not exist.
-        """
-        signature = "{}_dial.pkl".format(self.data_partition)
-        if self.cache_dir is not None:
-            if not os.path.exists(self.cache_dir):
-                os.makedirs(self.cache_dir)
-            cache_path = os.path.join(self.cache_dir, signature)
-        else:
-            cache_dir = os.mkdir("caches")
-            cache_path = os.path.join(cache_dir, signature)
-        
-        if os.path.exists(cache_path):
-            with open(cache_path, 'rb') as f:
-                logging.info("Loading cached instances from {}".format(cache_path))
-                self.instances = pickle.load(f)
-        else:          
-            if self.is_test:
-                if plan_path is None:
-                    raise ValueError("`plan_path` should not be None during inference!")
-                
-                logging.info("Loading raw data from {}".format(plan_path))
-                all_plans = []
-                with open(plan_path, 'r', encoding='utf-8') as fr:
-                    for line in fr:
-                        plan = json.loads(line.strip())
-                        all_plans.append(plan)
-                
-                logging.info("Loading raw data from {}".format(data_path))
-                all_samples = []
-                with open(data_path, 'r', encoding='utf-8') as fp:
-                    for line in fp:
-                        sample = json.loads(line.strip())
-                        data_sample = {
-                            "user_profile": sample["user_profile"],
-                            "knowledge": sample["knowledge"],
-                            "conversation": sample["conversation"]
-                        }
-                        all_samples.append(data_sample)
-                
-                assert len(all_samples) == len(all_plans)
-                for sample, plan in zip(all_samples, all_plans):
-                    sample["plan_path"] = plan["plan_path"]
-            
-            else:
-                logging.info("Loading raw data from {}".format(data_path))
-                all_samples = []
-                with open(data_path, 'r', encoding='utf-8') as fp:
-                    for line in fp:
-                        sample = json.loads(line.strip())    
-                        data_sample = {
-                            "user_profile": sample["user_profile"],
-                            "knowledge": sample["knowledge"],
-                            "conversation": sample["conversation"],
-                            "target": sample["target"],
-                            "action_path": sample["action_path"],
-                            "topic_path": sample["topic_path"],
-                            "response": sample["response"]
-                        }
-                        all_samples.append(data_sample)
-            
-            logging.info("Creating cache instances {}".format(signature))
-            for sample in tqdm(all_samples):
-                ctx_ids, ctx_segs = self._parse_input_context(sample)
-                plan_ids, plan_segs = self._parse_input_plan(sample)
-                
-                path_ids = self._parse_output_plan(sample)
-                resp_ids = self._parse_output_response(sample)
-                inputs = {
-                    "context_input_ids": ctx_ids,
-                    "context_seg_ids": ctx_segs,
-                    "plan_input_ids": plan_ids,
-                    "plan_seg_ids": plan_segs,
-                    "control_ids": path_ids,
-                    "response_ids": resp_ids
-                }
-                feature = DialInputFeature(**inputs)
-                self.instances.append(feature)
-
-            with open(cache_path, 'wb') as f:
-                pickle.dump(self.instances, f)
-
-        logging.info("Total of {} instances were cached.".format(len(self.instances)))
-    
-    @staticmethod
-    def _get_forward_path(action_path: list, topic_path: list, target_action: str, target_topic: str):
-        ptr = -1
-        for idx in range(len(action_path)):
-            if action_path[idx] == target_action and topic_path[idx] == target_topic:
-                ptr = idx
-                break
-        if ptr > 0:
-            action_path = action_path[:ptr+1]
-            topic_path = topic_path[:ptr+1]
-        elif ptr == 0:
-            action_path = [action_path[0]]
-            topic_path = [topic_path[0]]
-        else:
-            action_path = action_path + [target_action]
-            topic_path = topic_path + [target_topic]
-        path_str = ""
-        for a, t in zip(action_path, topic_path):
-            if not t in path_str:
-                path_str += "%s%s%s%s" % (ACT, a, TPC, t)
-            elif not a in path_str:
-                path_str += "%s%s%s%s" % (ACT, a, TPC, t)
-        return path_str
-    
-    @staticmethod
-    def _get_backward_path(action_path: list, topic_path: list, target_action: str, target_topic: str):
-        ptr = -1
-        for idx in range(len(action_path)):
-            if action_path[idx] == target_action and topic_path[idx] == target_topic:
-                ptr = idx
-                break
-        if ptr > 0:
-            action_path = action_path[:ptr+1]
-            topic_path = topic_path[:ptr+1]
-            action_path.reverse()
-            topic_path.reverse()
-        elif ptr == 0:
-            action_path = [action_path[0]]
-            topic_path = [topic_path[0]]
-        else:
-            action_path = [target_action] + action_path
-            topic_path = [target_topic] + topic_path
-        path_str = ""
-        for a, t in zip(action_path, topic_path):
-            if not t in path_str:
-                path_str += "%s%s%s%s" % (ACT, a, TPC, t)
-            elif not a in path_str:
-                path_str += "%s%s%s%s" % (ACT, a, TPC, t)
-        return path_str
-
-    def _parse_input_context(self, sample: dict):
-        # user profile
-        profile_tokens, profile_segs = [], []
-        for k, v in sample["user_profile"].items():
-            k_toks = self.tokenizer.tokenize(k)
-            v_toks = self.tokenizer.tokenize(v)
-            profile_tokens = profile_tokens + k_toks + v_toks
-            profile_segs = profile_segs + len(k_toks)*[0] + len(v_toks)*[0]
-        profile_tokens = profile_tokens + [SEP]
-        profile_segs = profile_segs + [1]
-
-        # domain knowledge
-        kg_tokens, kg_segs = [], []
-        for kg in sample["knowledge"]:
-            kg_tok = self.tokenizer.tokenize("".join(kg))
-            kg_tokens = kg_tokens + kg_tok + [SEP]
-            kg_segs = kg_segs + len(kg_tok)*[0] + [1]
-        
-        '''
-        # dialogue history
-        conv_tokens, conv_segs = [], []
-        history = sample["conversation"]
-        if len(history) > self.turn_type_size - 1:
-            history = history[len(history) - (self.turn_type_size - 1):]
-        for h in history:
-            h_toks = self.tokenizer.tokenize(h)
-            conv_tokens = conv_tokens + h_toks
-            conv_segs = conv_segs + len(h_toks)*[0]
-        conv_tokens = conv_tokens + [SEP]
-        conv_segs = conv_segs + [1]
-        
-        # concat as context
-        ctx_tokens =  conv_tokens + kg_tokens + profile_tokens
-        ctx_segs = conv_segs + kg_segs + profile_segs
-        '''
-        # concat as context
-        ctx_tokens =  kg_tokens + profile_tokens
-        ctx_segs = kg_segs + profile_segs
-        ctx_ids = self.tokenizer.convert_tokens_to_ids(ctx_tokens)
-        assert len(ctx_ids) == len(ctx_segs)
-        
-        if len(ctx_ids) > self.max_seq_len:
-            ctx_ids = ctx_ids[:self.max_seq_len]
-            ctx_segs = ctx_segs[:self.max_seq_len]
-        
-        return (ctx_ids, ctx_segs)
-    
-    def _parse_input_plan(self, sample: dict):
-        if self.is_test:
-            assert "plan_path" in sample
-            plan_path = sample["plan_path"]
-        else:
-            assert "action_path" in sample and "topic_path" in sample
-            plan_path = self._get_forward_path(
-                sample["action_path"], sample["topic_path"],
-                sample["target"][0], sample["target"][1]
-            )
-        plan_tokens = self.tokenizer.tokenize(plan_path)
-        plan_segs = [0] * len(plan_tokens)
-        
-        #plan_ids = self.tokenizer.convert_tokens_to_ids(plan_tokens)
-        
-        #print("plan_path: ", plan_path)
-        #print("plan_tokens: ", plan_tokens)
-        #print("plan_ids: ", plan_ids)
-        
-        # dialogue history
-        conv_tokens, conv_segs = [], []
-        history = sample["conversation"]
-        if len(history) > self.turn_type_size:
-            history = history[-self.turn_type_size:]
-        for h in history:
-            h_toks = self.tokenizer.tokenize(h)
-            conv_tokens = conv_tokens + h_toks
-            conv_segs = conv_segs + len(h_toks)*[0]
-        
-        if len(conv_tokens) + len(plan_tokens) > self.max_seq_len - 1:
-            conv_tokens = conv_tokens[-(self.max_seq_len-1-len(plan_tokens)):]
-            conv_segs = conv_segs[-(self.max_seq_len-1-len(plan_tokens)):]
-
-        prompt_tokens = plan_tokens + [SEP] + conv_tokens
-        prompt_segs = plan_segs + [1] + conv_segs
-        prompt_ids = self.tokenizer.convert_tokens_to_ids(prompt_tokens)
-        assert len(prompt_ids) == len(prompt_segs)
-        #print("prompt_tokens: ", prompt_tokens)
-        #print("")
-
-        return (prompt_ids, prompt_segs)
-
-    def _parse_output_response(self, sample: dict):
-        bos_token_id = self.tokenizer.convert_tokens_to_ids(BOS)
-        eos_token_id = self.tokenizer.convert_tokens_to_ids(EOS)
-        
-        if self.is_test:    
-            resp_ids = [bos_token_id]
-        else:
-            resp_tokens = self.tokenizer.tokenize(sample["response"])
-            resp_ids = [bos_token_id] + self.tokenizer.convert_tokens_to_ids(resp_tokens) + [eos_token_id]
-        
-        return resp_ids
-    
-    def _parse_output_plan(self, sample: dict):
-        bos_token_id = self.tokenizer.convert_tokens_to_ids(BOS)
-        eos_token_id = self.tokenizer.convert_tokens_to_ids(EOS)
-
-        if self.is_test:
-            assert "plan_path" in sample
-            plan_path = sample["plan_path"]
-        else:
-            assert "action_path" in sample and "topic_path" in sample
-            plan_path = self._get_forward_path(
-                sample["action_path"], sample["topic_path"],
-                sample["target"][0], sample["target"][1]
-            )
-        plan_tokens = self.tokenizer.tokenize(plan_path)
-        plan_ids = [bos_token_id] + self.tokenizer.convert_tokens_to_ids(plan_tokens) + [eos_token_id]
-        
-        return plan_ids
-  
-    def __len__(self):
-        return len(self.instances)
-
-    def __getitem__(self, index):
-        return self.instances[index]
-
-
 class DialGPT2Dataset(Dataset):
     """
     Self-defined DialGPT2Dataset class for dialogue generation.
@@ -757,18 +421,22 @@ class DialGPT2Dataset(Dataset):
         data_path,  
         data_partition,
         tokenizer,
+        special_tokens_dict,
         cache_dir=None, 
         max_seq_len=512,
         turn_type_size=16,
         is_test=False,
-        plan_path=None
+        plan_path=None,
+        lower_case=False
     ):
         self.data_partition = data_partition
         self.tokenizer = tokenizer
+        self.special_tokens_dict = special_tokens_dict
         self.cache_dir = cache_dir
         self.max_seq_len = max_seq_len
         self.turn_type_size = turn_type_size
         self.is_test = is_test
+        self.lower_case = lower_case
         
         self.instances = []
         self._cache_instances(data_path, plan_path)
@@ -852,7 +520,7 @@ class DialGPT2Dataset(Dataset):
         logging.info("Total of {} instances were cached.".format(len(self.instances)))
     
     @staticmethod
-    def _get_plan_path(action_path: list, topic_path: list, target_action: str, target_topic: str):
+    def _get_plan_path(action_path: list, topic_path: list, target_action: str, target_topic: str, lower_case: bool=False):
         ptr = -1
         for idx in range(len(action_path)):
             if action_path[idx] == target_action and topic_path[idx] == target_topic:
@@ -869,6 +537,9 @@ class DialGPT2Dataset(Dataset):
             topic_path = topic_path + [target_topic]
         path_str = ""
         for a, t in zip(action_path, topic_path):
+            if lower_case:
+                a = a.lower()
+                t = t.lower()
             if not t in path_str:
                 path_str += "%s%s%s%s" % (ACT, a, TPC, t)
             elif not a in path_str:
@@ -876,13 +547,15 @@ class DialGPT2Dataset(Dataset):
         return path_str
 
     def _parse_sample(self, sample: dict):
-        cls_token_id = self.tokenizer.convert_tokens_to_ids(CLS)
-        bos_token_id = self.tokenizer.convert_tokens_to_ids(BOS)
-        eos_token_id = self.tokenizer.convert_tokens_to_ids(EOS)
+        bos_token_id = self.special_tokens_dict["bos_token_id"]
+        eos_token_id = self.special_tokens_dict["eos_token_id"]
         
         # user profile
         profile_tokens = []
         for k, v in sample["user_profile"].items():
+            if self.lower_case:
+                k = k.lower()
+                v = v.lower()
             k_toks = self.tokenizer.tokenize(k)
             v_toks = self.tokenizer.tokenize(v)
             profile_tokens +=  k_toks + v_toks + [SEP]
@@ -890,7 +563,10 @@ class DialGPT2Dataset(Dataset):
         # domain knowledge
         kg_tokens = []
         for kg in sample["knowledge"]:
-            kg_toks = self.tokenizer.tokenize("".join(kg))
+            kg_str = " ".join(kg)
+            if self.lower_case:
+                kg_str = kg_str.lower()
+            kg_toks = self.tokenizer.tokenize(kg_str)
             kg_tokens +=  kg_toks + [SEP]
         
         # plan path
@@ -901,10 +577,13 @@ class DialGPT2Dataset(Dataset):
             assert "action_path" in sample and "topic_path" in sample
             plan_path = self._get_plan_path(
                 sample["action_path"], sample["topic_path"],
-                sample["target"][0], sample["target"][1]
+                sample["target"][0], sample["target"][1],
+                lower_case=self.lower_case
             )
         plan_tokens = self.tokenizer.tokenize(plan_path)
         control_ids = [bos_token_id] + self.tokenizer.convert_tokens_to_ids(plan_tokens) + [eos_token_id]
+        #print("plan_path: ", plan_path)
+        #print("plan_tokens: ", plan_tokens)
 
         # dialogue history
         conv_tokens = []
@@ -912,27 +591,32 @@ class DialGPT2Dataset(Dataset):
         if len(history) > self.turn_type_size:
             history = history[-self.turn_type_size:]
         for h in history:
+            if self.lower_case:
+                h = h.lower()
             h_toks = self.tokenizer.tokenize(h)
             conv_tokens += h_toks + [SEP]
         
         # concat as context
         ctx_tokens =  profile_tokens + kg_tokens + plan_tokens + [SEP] + conv_tokens
         ctx_ids = self.tokenizer.convert_tokens_to_ids(ctx_tokens)
+        if len(ctx_ids) > self.max_seq_len - 1:
+            ctx_tokens = ctx_tokens[-self.max_seq_len+1:]
+            ctx_ids = ctx_ids[-self.max_seq_len+1:]
         #print("ctx_tokens: ", ctx_tokens)
         #print("ctx_ids: ", ctx_ids)
-        if len(ctx_ids) > self.max_seq_len - 1:
-            ctx_ids = ctx_ids[-self.max_seq_len+1:]
-        
+        #print("")
+
         if self.is_test:    
-            input_ids = [cls_token_id] + ctx_ids
+            input_ids = [bos_token_id] + ctx_ids
             lm_labels = [IGNORE_INDEX] * (len(ctx_ids) + 1)
         else:
-            resp_tokens = self.tokenizer.tokenize(sample["response"])
+            resp_str = sample["response"].lower() if self.lower_case else sample["response"]
+            resp_tokens = self.tokenizer.tokenize(resp_str)
             resp_ids = self.tokenizer.convert_tokens_to_ids(resp_tokens) + [eos_token_id]
             #print("resp_tokens: ", resp_tokens)
             #print("resp_ids: ", resp_ids)
             #print("")
-            input_ids = [cls_token_id] + ctx_ids + resp_ids
+            input_ids = [bos_token_id] + ctx_ids + resp_ids
             lm_labels = [IGNORE_INDEX] * (len(ctx_ids) + 1) + resp_ids
         
         return (input_ids, control_ids, lm_labels)
