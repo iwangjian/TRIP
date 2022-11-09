@@ -47,7 +47,7 @@ class PlanCollator(object):
     
     def get_attention_mask(self, data_tensor: torch.tensor):
         attention_mask = data_tensor.masked_fill(data_tensor == self.padding_idx, 0)
-        attention_mask = attention_mask.masked_fill(attention_mask != self.padding_idx, 1)
+        attention_mask = attention_mask.masked_fill(data_tensor != self.padding_idx, 1)
         attention_mask = attention_mask.to(self.device).contiguous()
         return attention_mask
     
@@ -135,7 +135,7 @@ class DialCollator(object):
     
     def get_attention_mask(self, data_tensor: torch.tensor):
         attention_mask = data_tensor.masked_fill(data_tensor == self.padding_idx, 0)
-        attention_mask = attention_mask.masked_fill(attention_mask != self.padding_idx, 1)
+        attention_mask = attention_mask.masked_fill(data_tensor != self.padding_idx, 1)
         attention_mask = attention_mask.to(self.device).contiguous()
         return attention_mask
     
@@ -204,7 +204,7 @@ class DialGPT2Collator(object):
     
     def get_attention_mask(self, data_tensor: torch.tensor):
         attention_mask = data_tensor.masked_fill(data_tensor == self.padding_idx, 0)
-        attention_mask = attention_mask.masked_fill(attention_mask != self.padding_idx, 1)
+        attention_mask = attention_mask.masked_fill(data_tensor != self.padding_idx, 1)
         attention_mask = attention_mask.to(self.device).contiguous()
         return attention_mask
     
