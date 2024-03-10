@@ -14,10 +14,10 @@ Moreover, we propose a target-constrained decoding algorithm with a bidirectiona
 
 Subsequently, we adopt the planned dialogue paths to guide dialogue generation in a pipeline manner, where we explore two variants: *prompt-based* generation and *plan-controlled* generation. 
 <p align="center">
-<img src="figure/prompt-based-gen.png" width="56%" />
+<img src="figure/prompt-based-gen.png" width="45%" />
 </p>
 <p align="center">
-<img src="figure/plan-controlled-gen.png" width="75%" />
+<img src="figure/plan-controlled-gen.png" width="70%" />
 </p>
 
 
