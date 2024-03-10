@@ -1,7 +1,7 @@
 # Self-defined ignore
 .DS_Store
 bak_data/
-data_*/
+data/
 db_*/
 caches/
 logs/

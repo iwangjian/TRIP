@@ -183,7 +183,6 @@ class PlanDataset(Dataset):
         conv_tokens = conv_tokens + [SEP]
         conv_segs = conv_segs + [1]
         #print("conv_tokens: ", conv_tokens)
-        #print("")
         
         # concat as context
         ctx_tokens =  conv_tokens + kg_tokens + profile_tokens
@@ -270,21 +269,7 @@ class PlanDataset(Dataset):
                 for toks in forward_neg_tokens]
             for ids, masks in zip(forward_neg_ids, forward_neg_masks):
                 assert len(ids) == len(masks)
-            '''
-            print("forward_plan_tokens: ", forward_plan_tokens)
-            print("forward_plan_ids: ", forward_plan_ids)
-            print("forward_tgt_masks: ", forward_tgt_masks)
             
-            print("forward_neg_tokens: ")
-            for fnt in forward_neg_tokens:
-                print(fnt)
-            print("forward_neg_ids: ")
-            for fni in forward_neg_ids:
-                print(fni)
-            print("forward_neg_masks: ")
-            for fnm in forward_neg_masks:
-                print(fnm)
-            '''
             # backward path
             backward_plan = self._get_backward_path(
                 sample["action_path"], sample["topic_path"],
@@ -302,21 +287,6 @@ class PlanDataset(Dataset):
                 for toks in backward_neg_tokens]
             for ids, masks in zip(backward_neg_ids, backward_neg_masks):
                 assert len(ids) == len(masks)
-            '''
-            print("backward_plan_tokens: ", backward_plan_tokens)
-            print("backward_plan_ids: ", backward_plan_ids)
-            print("backward_tgt_masks: ", backward_tgt_masks)
-            
-            print("backward_neg_tokens: ")
-            for bnt in backward_neg_tokens:
-                print(bnt)
-            print("backward_neg_ids: ")
-            for bni in backward_neg_ids:
-                print(bni)
-            print("backward_neg_masks: ")
-            for bnm in backward_neg_masks:
-                print(bnm)
-            '''
         
         return (forward_plan_ids, forward_tgt_masks, forward_neg_ids, forward_neg_masks, \
             backward_plan_ids, backward_tgt_masks, backward_neg_ids, backward_neg_masks)
@@ -604,7 +574,6 @@ class DialGPT2Dataset(Dataset):
             ctx_ids = ctx_ids[-self.max_seq_len+1:]
         #print("ctx_tokens: ", ctx_tokens)
         #print("ctx_ids: ", ctx_ids)
-        #print("")
 
         if self.is_test:    
             input_ids = [bos_token_id] + ctx_ids
@@ -615,7 +584,7 @@ class DialGPT2Dataset(Dataset):
             resp_ids = self.tokenizer.convert_tokens_to_ids(resp_tokens) + [eos_token_id]
             #print("resp_tokens: ", resp_tokens)
             #print("resp_ids: ", resp_ids)
-            #print("")
+
             input_ids = [bos_token_id] + ctx_ids + resp_ids
             lm_labels = [IGNORE_INDEX] * (len(ctx_ids) + 1) + resp_ids
         

@@ -75,7 +75,7 @@ def parse_config():
     parser.add_argument('--test_batch_size', type=int, default=1)
     parser.add_argument('--max_dec_len', type=int, default=80)
     parser.add_argument('--beam_size', type=int, default=3)
-    parser.add_argument('--lambda_scale', type=float, default=0.1)
+    parser.add_argument('--lambda_scale', type=float, default=3.0)
     parser.add_argument('--min_length', type=int, default=1)
     parser.add_argument('--repetition_penalty', type=float, default=1.0)
     parser.add_argument('--diversity_penalty', type=float, default=0.0)
@@ -204,15 +204,11 @@ def run_test(args):
         for inputs in tqdm(test_loader):
             with torch.no_grad():
                 outputs = model.generate(args, inputs)
-                # post-process
-                backward_plans = convert_ids_to_tokens(outputs["backward_plan"], tokenizer, lang=args.lang)
-                beam_backward_plans = convert_ids_to_tokens(outputs["beam_backward_plan"], tokenizer, lang=args.lang)
-                #beam_forward_plans = convert_ids_to_tokens(outputs["beam_forward_plan"], tokenizer)
-                assert len(backward_plans) == len(beam_backward_plans)
-                
-                for bp, beam_bp in zip(backward_plans, beam_backward_plans):
-                    action, topic = get_eval_output(bp, backward=True)
-                    plan_path = get_plan_path(bp, backward=True)
+                # postprocess
+                batch_plans = convert_ids_to_tokens(outputs["output_plan"], tokenizer, lang=args.lang)
+                for cand_path in batch_plans:
+                    action, topic = get_eval_output(cand_path, backward=True)
+                    plan_path = get_plan_path(cand_path, backward=True)
                     plan = {
                         "action": action,
                         "topic": topic,

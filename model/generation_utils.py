@@ -352,7 +352,6 @@ def biconstrained_beam_search(
         )
         back_beam_scores = back_beam_outputs["next_beam_scores"]
         back_beam_next_tokens = back_beam_outputs["next_beam_tokens"]
-        back_beam_idx = back_beam_outputs["next_beam_indices"]
 
         back_plan_ids = torch.cat(
             [back_plan_ids[back_beam_idx, :], back_beam_next_tokens.unsqueeze(-1)], dim=-1)
@@ -399,7 +398,6 @@ def biconstrained_beam_search(
     )
     back_cand_seqs = back_seq_outputs["candidate_sequences"]
     back_cand_probs = torch.exp(back_seq_outputs["candidate_sequence_scores"])
-    back_seqs = back_seq_outputs["sequences"]
 
     for_seq_outputs = for_const_beam_scorer.finalize(
         for_plan_ids,
@@ -411,7 +409,6 @@ def biconstrained_beam_search(
         max_length=stopping_criteria.max_length
     )
     for_cand_seqs = for_seq_outputs["candidate_sequences"]
-    for_seqs = for_seq_outputs["sequences"]
 
     # prepare output masks
     back_seq_len = back_cand_seqs.size(-1) - 1
@@ -451,7 +448,7 @@ def biconstrained_beam_search(
         best_seq = back_cand_seqs[idx, best_index, :]
         best_back_seqs[idx, :len(best_seq)] = best_seq
 
-    return (best_back_seqs, back_seqs, for_seqs)
+    return best_back_seqs
 
 
 def beam_search(

@@ -194,60 +194,6 @@ class TRIP(nn.Module):
             for_neg_masks = for_neg_attn_masks[:, :, :-1]
             for_neg_tgt_masks = for_neg_tgt_masks[:, :, 1:]
             
-            '''
-            #print("ctx_input_ids: ", ctx_input_ids.size())
-            #print(ctx_input_ids)
-            #print("ctx_masks: ", ctx_masks.size())
-            #print(ctx_masks)
-            #print("tgt_input_ids: ", tgt_input_ids.size())
-            #print(tgt_input_ids)
-            #print("tgt_masks: ", tgt_masks.size())
-            #print(tgt_masks)
-            
-            print("for_input_ids: ", for_input_ids.size())
-            print(for_input_ids)
-            print("for_attn_masks: ", for_attn_masks.size())
-            print(for_attn_masks)
-            print("for_plan_gold: ", for_plan_gold.size())
-            print(for_plan_gold)
-            print("for_gold_masks: ", for_gold_masks.size())
-            print(for_gold_masks)
-            print("for_tgt_masks: ", for_tgt_masks.size())
-            print(for_tgt_masks)
-            
-            print("for_neg_input: ", for_neg_input.size())
-            for bidx in range(for_neg_input.size(0)):
-                print(for_neg_input[bidx, :, :])
-            print("for_neg_masks: ", for_neg_masks.size())
-            for bidx in range(for_neg_masks.size(0)):
-               print(for_neg_masks[bidx, :, :])
-            print("for_neg_poss: ", for_neg_poss.size())
-            for bidx in range(for_neg_poss.size(0)):
-                print(for_neg_poss[bidx, :, :])
-            
-            print("-------------------------------------------------------------")
-            print("back_input_ids: ", back_input_ids.size())
-            print(back_input_ids)
-            print("back_attn_masks: ", back_attn_masks.size())
-            print(back_attn_masks)
-            print("back_plan_gold: ", back_plan_gold.size())
-            print(back_plan_gold)
-            print("back_gold_masks: ", back_gold_masks.size())
-            print(back_gold_masks)
-            print("back_tgt_masks: ", back_tgt_masks.size())
-            print(back_tgt_masks)
-
-            print("back_neg_input: ", back_neg_input.size())
-            for bidx in range(back_neg_input.size(0)):
-                print(back_neg_input[bidx, :, :])
-            print("back_neg_masks: ", back_neg_masks.size())
-            for bidx in range(back_neg_masks.size(0)):
-                print(back_neg_masks[bidx, :, :])
-            print("back_neg_poss: ", back_neg_poss.size())
-            for bidx in range(back_neg_poss.size(0)):
-                print(back_neg_poss[bidx, :, :])
-            raise ValueError("exit!!!")
-            '''
             
         enc_hidden_output, enc_attn_mask, tgt_hidden_states, tgt_masks = self.encode(
             ctx_input_ids=ctx_input_ids, tgt_input_ids=tgt_input_ids,
@@ -367,7 +313,7 @@ class TRIP(nn.Module):
         repetition_penalty = args.repetition_penalty or None
         no_repeat_ngram_size = args.no_repeat_ngram_size or None
 
-        output = biconstrained_beam_search(
+        best_back_seq = biconstrained_beam_search(
             model=self,
             inputs=inputs,
             num_beams=beam_size,
@@ -383,9 +329,7 @@ class TRIP(nn.Module):
         )
         
         output_dict = {
-            "backward_plan": output[0],
-            "beam_backward_plan": output[1],
-            "beam_forward_plan": output[2]
+            "output_plan": best_back_seq
         }
 
         return output_dict

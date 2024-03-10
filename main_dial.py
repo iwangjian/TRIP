@@ -10,11 +10,11 @@ from tqdm import tqdm
 
 import torch
 from torch.utils.data import DataLoader
-from model.model_trip_dial_gpt2 import TRIPDialGPT2
+from model.model_trip_dial import TRIPDialGPT2
 from utils.dataset import DialGPT2Dataset
 from utils.data_utils import get_tokenizer, convert_ids_to_tokens
 from utils.data_collator import DialGPT2Collator
-from utils.trainer import Trainer, IgniteTrainer
+from utils.trainer import IgniteTrainer
 
 logging.basicConfig(
     level = logging.INFO,
@@ -44,7 +44,7 @@ def parse_config():
     # training args
     parser.add_argument('--load_checkpoint', type=str, default=None)
     parser.add_argument('--num_epochs', type=int, default=5)
-    parser.add_argument('--batch_size', type=int, default=6)
+    parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--log_steps', type=int, default=200)
     parser.add_argument('--validate_steps', type=int, default=1000)
     parser.add_argument('--use_control', type=str2bool, default="False")
@@ -148,16 +148,6 @@ def run_train(args):
     trainable_num = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logging.info("Total parameters: {}\tTrainable parameters: {}".format(total_num, trainable_num))
     
-    '''
-    # build trainer and execute model training
-    trainer = Trainer(model=model, train_loader=train_loader, dev_loader=dev_loader,
-        log_dir=args.log_dir, log_steps=args.log_steps, validate_steps=args.validate_steps, 
-        num_epochs=args.num_epochs, lr=args.lr, warmup_ratio=args.warmup_ratio,
-        weight_decay=args.weight_decay, max_grad_norm=args.max_grad_norm,
-        gradient_accumulation_steps=args.gradient_accumulation_steps
-    )
-    trainer.train()
-    '''
     # build trainer and execute model training
     trainer = IgniteTrainer(model=model, 
         train_loader=train_loader,
