@@ -1,5 +1,5 @@
 # TRIP
-This repository contains code and data for the paper [Target-constrained Bidirectional Planning for Generation of Target-oriented Proactive Dialogue]() (TBA) accepted by ACM Transactions on Information Systems (TOIS).
+This repository contains code and data for the paper [Target-constrained Bidirectional Planning for Generation of Target-oriented Proactive Dialogue](https://arxiv.org/abs/2403.06063) accepted by ACM Transactions on Information Systems (TOIS).
 
 ## Overview
 We propose a novel target-constrained bidirectional planning (TRIP) approach for target-oriented proactive dialogue systems. It plans an appropriate dialogue path by *looking ahead* and *looking back*, bidirectionally generating a dialogue path consisting of a sequence of <action, topic> pairs using two Transformer decoders. They are expected to supervise each other and converge on consistent actions and topics by minimizing the decision gap and contrastive generation of targets. 
@@ -12,7 +12,7 @@ Moreover, we propose a target-constrained decoding algorithm with a bidirectiona
 <img src="figure/constrained-decoding.png" width="75%" />
 </p>
 
-Subsequently, we adopt the planned dialogue paths to guide dialogue generation in a pipeline manner, where we explore two variants: *prompt-based* generation and *plan-controlled* generation. 
+Subsequently, we adopt the planned dialogue paths to guide dialogue generation in a pipeline manner, where we explore two variants: ***prompt-based*** generation and ***plan-controlled*** generation. 
 <p align="center">
 <img src="figure/prompt-based-gen.png" width="45%" />
 </p>
