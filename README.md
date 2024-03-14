@@ -60,7 +60,7 @@ python main_plan.py --mode test --lang "en" \
     --max_dec_len 80 \
     --beam_size 3
 ```
-Note that the output file `best_model_test_seen.txt` or `best_model_test_unseen.txt` will be saved in the `--output_dir`.
+Note that the output file `best_model_test_seen.jsonl` or `best_model_test_unseen.jsonl` will be saved in the `--output_dir`.
 
 ### Dialogue Model Fine-tuning
 ```python
@@ -79,7 +79,7 @@ If you want to use the planned paths to control the dialogue generation, set `--
 ```python
 python main_dial.py --mode test --lang "en" \
     --test_data "data/DuRecDial2_en/sample_test_seen.jsonl" \
-    --plan_data "outputs/DuRecDial2_en/plan/best_model_test_seen.txt" \
+    --plan_data "outputs/DuRecDial2_en/plan/best_model_test_seen.jsonl" \
     --cache_dir "caches/DuRecDial2_en/dial" \
     --log_dir "logs/DuRecDial2_en/dial" \
     --output_dir "outputs/DuRecDial2_en/dial" \
