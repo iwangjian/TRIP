@@ -197,7 +197,7 @@ def run_test(args):
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
     
-    output_prefix = model_path.split('/')[-1].replace(".bin", "_%s.txt" % data_partition)
+    output_prefix = model_path.split('/')[-1].replace(".bin", "_%s.jsonl" % data_partition)
     output_path = os.path.join(args.output_dir, output_prefix)
     
     with open(output_path, 'w', encoding='utf-8') as f:

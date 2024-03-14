@@ -352,6 +352,7 @@ def biconstrained_beam_search(
         )
         back_beam_scores = back_beam_outputs["next_beam_scores"]
         back_beam_next_tokens = back_beam_outputs["next_beam_tokens"]
+        back_beam_idx = back_beam_outputs["next_beam_indices"]
 
         back_plan_ids = torch.cat(
             [back_plan_ids[back_beam_idx, :], back_beam_next_tokens.unsqueeze(-1)], dim=-1)

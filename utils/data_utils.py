@@ -58,9 +58,9 @@ def convert_ids_to_tokens(output, tokenizer, lang="en"):
             else:
                 return_tokens.append(token)
         if lang == "zh":
-            return_str = "".join(return_tokens)
+            return_str = "".join(return_tokens).strip()
         else:
-            return_str = " ".join(return_tokens)
+            return_str = " ".join(return_tokens).strip()
         sentences.append(return_str)
     return sentences
 
