@@ -31,9 +31,9 @@ pip install -r requirements.txt
 
 
 ## Datasets
-Please download the repurposed datasets from the following OneDrive links:
-- [DuRecDial](https://connectpolyu-my.sharepoint.com/:u:/g/personal/21037774r_connect_polyu_hk/ESAEWP_Q9_BFqOHxHZbeAIwBxQPoLnLtPAlpgz0r61JYkw?e=ksZ4b8) (Chinese)
-- [DuRecDial 2.0](https://connectpolyu-my.sharepoint.com/:u:/g/personal/21037774r_connect_polyu_hk/ERZEMLJO8cpBvT9HZKX9sKUB9BtQ4CNLHzR46TzHNL-c7Q?e=xMZp7Q) (English)
+Please download the repurposed datasets from the following Google Drive links:
+- [DuRecDial](https://drive.google.com/file/d/1pdpuyNDD0LBZ2yklIgl8kDol_MNODcdF/view?usp=sharing) (Chinese)
+- [DuRecDial 2.0](https://drive.google.com/file/d/1qkYAeLw8k9LZ9Xo2MOvg_d1CTEPrAiKp/view?usp=sharing) (English)
 
 
 ## Quickstart
